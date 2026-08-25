@@ -12,7 +12,7 @@ struct Edge {
     long long flow;
     int to;
     int rev;
-}
+};
 
 class Dinic {
     private:
