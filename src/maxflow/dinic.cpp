@@ -54,6 +54,57 @@ class Dinic {
 
         long long dfs(int v, int t, long long pushed)
         {
-            
+            if(pushed == 0 || v == t) return pushed;
+            for(int &cid = ptr[v]; cid < (int)adj[v].size(); ++cid) {
+                dfs_operations++;
+                Edge &e = adj[v][cid]; 
+                int tr = edge.to;
+                if(level[v] + 1 != level[tr] || edge.cap - edge.flow == 0) continue;
+                long long push = dfs(tr, t, min(pushed, edge.cap - edge.flow));
+                if (push == 0) continue;
+                edge.flow += push;
+                adj[tr][edge.rev].flow -= push;
+                return push;
+            }
+            return 0;
+        }
+        long long maxFlow(int s, int t) {
+            long long flow = 0;
+            while (bfs(s, t)) {
+                fill(ptr.begin(), ptr.end(), 0);
+                while (long long pushed = dfs(s, t, LLONG_MAX)) {
+                    flow += pushed;
+                }
+            }
+            return flow;
         }
 };
+
+int main() {
+    ifstream infile("caida_bandwidth_graph.txt");
+    if (!infile) {
+        cerr << "Error opening graph file." << endl;
+        return 1;
+    }
+    int V, E;
+    infile >> V >> E;
+    Dinic dinic(V);
+    for (int i = 0; i < E; ++i) {
+        int u, v;
+        long long cap;
+        infile >> u >> v >> cap;
+        dinic.addEdge(u, v, cap);
+    }
+    infile.close();
+    int source = 0; // Assuming source is vertex 0
+    int sink = V - 1; // Assuming sink is the last vertex
+    auto start = high_resolution_clock::now();
+    long long max_flow = dinic.maxFlow(source, sink);
+    auto end = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(end - start);
+    cout << "Maximum Flow: " << max_flow << endl;
+    cout << "BFS Operations: " << dinic.bfs_operations << endl;
+    cout << "DFS Operations: " << dinic.dfs_operations << endl;
+    cout << "Time taken: " << duration.count() << " milliseconds" << endl;
+    return 0;
+}
