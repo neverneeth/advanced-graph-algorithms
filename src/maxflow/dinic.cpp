@@ -3,6 +3,7 @@
 #include <queue>
 #include <fstream>
 #include <chrono>
+#include <climits>
 
 using namespace std;
 using namespace std::chrono;
@@ -80,31 +81,56 @@ class Dinic {
         }
 };
 
-int main() {
-    ifstream infile("caida_bandwidth_graph.txt");
-    if (!infile) {
-        cerr << "Error opening graph file." << endl;
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        cerr << "Usage: " << argv[0]
+             << " <graph_file> <source> <target>" << endl;
         return 1;
     }
+
+    const char* filename = argv[1];
+    int source = stoi(argv[2]);
+    int sink = stoi(argv[3]);
+
+    ifstream infile(filename);
+    if (!infile) {
+        cerr << "Error opening graph file: " << filename << endl;
+        return 1;
+    }
+
     int V, E;
     infile >> V >> E;
+
+    if (source < 0 || source >= V || sink < 0 || sink >= V) {
+        cerr << "Error: source or target vertex is out of range." << endl;
+        return 1;
+    }
+
     Dinic dinic(V);
+
     for (int i = 0; i < E; ++i) {
         int u, v;
         long long cap;
         infile >> u >> v >> cap;
         dinic.addEdge(u, v, cap);
     }
+
     infile.close();
-    int source = 0; // Assuming source is vertex 0
-    int sink = V - 1; // Assuming sink is the last vertex
+
     auto start = high_resolution_clock::now();
+
     long long max_flow = dinic.maxFlow(source, sink);
+
     auto end = high_resolution_clock::now();
-    auto duration = duration_cast<milliseconds>(end - start);
+
+    auto duration = duration_cast<microseconds>(end - start);
+
+    cout << "Source: " << source << endl;
+    cout << "Target: " << sink << endl;
     cout << "Maximum Flow: " << max_flow << endl;
     cout << "BFS Operations: " << dinic.bfs_operations << endl;
     cout << "DFS Operations: " << dinic.dfs_operations << endl;
-    cout << "Time taken: " << duration.count() << " milliseconds" << endl;
+    cout << "Time taken: " << duration.count() << " microseconds" << endl;
+
     return 0;
 }
