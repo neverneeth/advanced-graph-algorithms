@@ -58,12 +58,12 @@ class Dinic {
             for(int &cid = ptr[v]; cid < (int)adj[v].size(); ++cid) {
                 dfs_operations++;
                 Edge &e = adj[v][cid]; 
-                int tr = edge.to;
-                if(level[v] + 1 != level[tr] || edge.cap - edge.flow == 0) continue;
-                long long push = dfs(tr, t, min(pushed, edge.cap - edge.flow));
+                int tr = e.to;
+                if(level[v] + 1 != level[tr] || e.cap - e.flow == 0) continue;
+                long long push = dfs(tr, t, min(pushed, e.cap - e.flow));
                 if (push == 0) continue;
-                edge.flow += push;
-                adj[tr][edge.rev].flow -= push;
+                e.flow += push;
+                adj[tr][e.rev].flow -= push;
                 return push;
             }
             return 0;
