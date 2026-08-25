@@ -124,13 +124,8 @@ int main(int argc, char* argv[]) {
     auto end = high_resolution_clock::now();
 
     auto duration = duration_cast<microseconds>(end - start);
-
-    cout << "Source: " << source << endl;
-    cout << "Target: " << sink << endl;
-    cout << "Maximum Flow: " << max_flow << endl;
-    cout << "BFS Operations: " << dinic.bfs_operations << endl;
-    cout << "DFS Operations: " << dinic.dfs_operations << endl;
-    cout << "Time taken: " << duration.count() << " microseconds" << endl;
+    // Machine readable output
+    cout << source << "," << sink << "," << max_flow << "," << dinic.bfs_operations << "," << dinic.dfs_operations << "," << duration.count() << endl;
 
     return 0;
 }
