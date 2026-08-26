@@ -1,3 +1,8 @@
+# Any image file across the repo must be ignored
+
+*.png
+*.jpg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
