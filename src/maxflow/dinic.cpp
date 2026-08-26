@@ -9,9 +9,9 @@ using namespace std;
 using namespace std::chrono;
 
 struct Edge {
+    int to;
     long long cap;
     long long flow;
-    int to;
     int rev;
 };
 
@@ -27,11 +27,12 @@ class Dinic {
         Dinic(int V) : V(V), adj(V), level(V), ptr(V) {}
         
         void addEdge(int from, int to, long long cap) {
-            Edge a = {cap, 0, to, (int)adj[to].size()};
-            Edge b = {0, 0, from, (int)adj[from].size()};
-            adj[from].push_back(a);
-            adj[to].push_back(b);
-        }
+        adj[from].push_back({to, cap, 0, (int)adj[to].size()});
+        adj[to].push_back({from, 0, 0, (int)adj[from].size() - 1}); // Residual for forward
+
+        adj[to].push_back({from, cap, 0, (int)adj[from].size()});
+        adj[from].push_back({to, 0, 0, (int)adj[to].size() - 1});   // Residual for backward
+    }
 
         bool bfs(int s, int t)
         {
