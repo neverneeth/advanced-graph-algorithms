@@ -19,9 +19,8 @@ with open(data / "caida_bandwidth_graph.txt", "r") as f:
             print(f"Processed {count} edges...")
 
 degree_dict = dict(G.degree())
-top_nodes = sorted(degree_dict, key=degree_dict.get, reverse=True)[:100]
+top_nodes = sorted(degree_dict, key=degree_dict.get, reverse=True)[:500]
 
 top_subgraph = G.subgraph(top_nodes)
 
-nx.draw(top_subgraph, with_labels=True, node_size=50, font_size=8, font_color="white", node_color="blue", edge_color="gray")
-plt.savefig(data / "top_100_nodes_graph.png", dpi=300)
+nx.write_graphml(top_subgraph, data / "top_500_nodes_subgraph.graphml")
