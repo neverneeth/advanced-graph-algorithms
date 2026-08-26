@@ -20,33 +20,27 @@ def preprocess_caida_data(input_filepath, output_filepath):
         for line_num, line in enumerate(f, 1):
             line = line.strip()
             
-            # Skip comments and empty lines
             if not line or line.startswith('#'):
                 continue
                 
             parts = line.split('\t')
             
-            # We only care about Direct (D) links
             if parts[0] == 'D' and len(parts) >= 3:
                 u_str = parts[1]
                 v_str = parts[2]
                 
-                # Filter out AS sets (',') and MOAS ('_')
                 if '_' in u_str or ',' in u_str or '_' in v_str or ',' in v_str:
                     continue
                 
-                # Filter out UNKNOWN mappings
                 if u_str == "UNKNOWN" or v_str == "UNKNOWN":
                     continue
                     
                 u = int(u_str)
                 v = int(v_str)
                 
-                # Ignore self-loops
                 if u == v:
                     continue
                 
-                # Ensure undirected deduplication so we don't double-count degrees
                 edge = (min(u, v), max(u, v))
                 if edge not in edges:
                     edges.add(edge)
@@ -65,11 +59,8 @@ def preprocess_caida_data(input_filepath, output_filepath):
         node: dense_id
         for dense_id, node in enumerate(sorted(degrees))
     }
-    # ==========================================
-    # PASS 2: Assign Capacity with Noise & Write
-    # ==========================================
+
     with open(output_filepath, 'w') as f:
-        # Write header for easy C++ ingestion
         f.write(f"{num_nodes} {num_edges}\n")
         
         for u, v in edges:
