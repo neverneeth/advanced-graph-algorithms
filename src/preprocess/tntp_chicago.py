@@ -7,8 +7,8 @@ data_dir = base / "datasets" / "tntp"
 data_dir.mkdir(parents=True, exist_ok=True)
 output_file = data_dir / "chicago_network.txt"
 
-url = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/master/Chicago-Regional/ChicagoRegional_net.tntp"
-raw_file = data_dir / "ChicagoRegional_net.tntp"
+url = "https://raw.githubusercontent.com/bstabler/TransportationNetworks/refs/heads/master/Chicago-Sketch/ChicagoSketch_net.tntp"
+raw_file = data_dir / "ChicagoSketch_net.tntp"
 
 def download_dataset():
     if not raw_file.exists():
