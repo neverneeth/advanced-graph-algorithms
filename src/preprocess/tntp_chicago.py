@@ -34,14 +34,17 @@ def preprocess_tntp():
             if not in_data_section or not line or line.startswith("<"):
                 continue
                 
-            parts = line.split(';')
+            clean_line = line.replace(';', '').strip()
+            parts = clean_line.split()
+            
             if len(parts) >= 5:
-                u = int(parts[0].strip())
-                v = int(parts[1].strip())
-                cap = float(parts[2].strip())
-                cost = float(parts[4].strip()) 
+                u = int(parts[0])
+                v = int(parts[1])
+                cap = float(parts[2])
+                cost = float(parts[4]) 
                 cap_int = max(1, int(cap))
-                cost_int = max(1, int(cost * 100))                 
+                cost_int = max(1, int(cost * 100)) 
+                
                 edges.append((u, v, cap_int, cost_int))
                 max_node = max(max_node, u, v)
 
@@ -57,5 +60,6 @@ def preprocess_tntp():
     print(f"Preprocessing complete. Saved to {output_file}")
 
 if __name__ == "__main__":
-    download_dataset()
+    if not output_file.exists():
+        download_dataset()
     preprocess_tntp()
