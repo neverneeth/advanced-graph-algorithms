@@ -4,6 +4,7 @@
 #include <fstream>
 #include <chrono>
 #include <climits>
+#include <stdexcept>
 
 using namespace std;
 using namespace std::chrono;
@@ -14,27 +15,25 @@ struct Edge {
     long long flow;
     long long cost;
     int rev;
+    bool original; 
 };
 
 class CycleCanceling {
 private:
     int V;
     vector<vector<Edge>> adj;
-
     vector<long long> dist;
     vector<int> parent_node;
     vector<int> parent_edge;
-    vector<int> count;
-    vector<bool> in_queue;
 
 public:
     long long cycles_canceled = 0;
 
-    CycleCanceling(int V) : V(V), adj(V), dist(V), parent_node(V), parent_edge(V), count(V), in_queue(V) {}
+    CycleCanceling(int V) : V(V), adj(V), dist(V), parent_node(V), parent_edge(V) {}
 
     void addEdge(int from, int to, long long cap, long long cost) {
-        adj[from].push_back({to, cap, 0, cost, (int)adj[to].size()});
-        adj[to].push_back({from, 0, 0, -cost, (int)adj[from].size() - 1});
+        adj[from].push_back({to, cap, 0, cost, (int)adj[to].size(), true});
+        adj[to].push_back({from, 0, 0, -cost, (int)adj[from].size() - 1, false});
     }
 
     bool establish_initial_flow(int s, int t, long long target_flow) {
@@ -50,7 +49,7 @@ public:
                 int u = q.front();
                 q.pop();
 
-                for (int i = 0; i < adj[u].size(); ++i) {
+                for (size_t i = 0; i < adj[u].size(); ++i) {
                     auto& e = adj[u][i];
                     if (p_node[e.to] == -1 && e.to != s && e.cap - e.flow > 0) {
                         p_node[e.to] = u;
@@ -61,6 +60,7 @@ public:
             }
 
             if (p_node[t] == -1) break; 
+
             long long push = target_flow - current_flow;
             int curr = t;
             while (curr != s) {
@@ -84,62 +84,48 @@ public:
     }
 
     bool cancel_negative_cycle() {
-        fill(dist.begin(), dist.end(), 0); 
+        fill(dist.begin(), dist.end(), 0);
         fill(parent_node.begin(), parent_node.end(), -1);
         fill(parent_edge.begin(), parent_edge.end(), -1);
-        fill(count.begin(), count.end(), 0);
-        fill(in_queue.begin(), in_queue.end(), true);
-        
-        queue<int> q;
-        for (int i = 0; i < V; ++i) q.push(i);
 
-        int cycle_start = -1;
+        int x = -1;
 
-        while (!q.empty()) {
-            int u = q.front();
-            q.pop();
-            in_queue[u] = false;
-
-            for (int i = 0; i < adj[u].size(); ++i) {
-                auto& e = adj[u][i];
-                if (e.cap - e.flow > 0 && dist[e.to] > dist[u] + e.cost) {
-                    dist[e.to] = dist[u] + e.cost;
-                    parent_node[e.to] = u;
-                    parent_edge[e.to] = i;
-
-                    if (!in_queue[e.to]) {
-                        q.push(e.to);
-                        in_queue[e.to] = true;
-                        if (++count[e.to] >= V) {
-                            cycle_start = e.to;
-                            break;
-                        }
+        for (int iter = 0; iter < V; ++iter) {
+            x = -1;
+            for (int u = 0; u < V; ++u) {
+                for (size_t i = 0; i < adj[u].size(); ++i) {
+                    auto& e = adj[u][i];
+                    if (e.cap - e.flow > 0 && dist[e.to] > dist[u] + e.cost) {
+                        dist[e.to] = dist[u] + e.cost;
+                        parent_node[e.to] = u;
+                        parent_edge[e.to] = i;
+                        x = e.to;
                     }
                 }
             }
-            if (cycle_start != -1) break;
+            if (x == -1) return false;
         }
 
-        if (cycle_start == -1) return false;
-
-        int v = cycle_start;
-        for (int i = 0; i < V; ++i) v = parent_node[v];
+        int v = x;
+        for (int i = 0; i < V; ++i) {
+            v = parent_node[v];
+        }
 
         long long bottleneck = LLONG_MAX;
         int curr = v;
         do {
             int p = parent_node[curr];
-            int e_idx = parent_edge[curr];
-            bottleneck = min(bottleneck, adj[p][e_idx].cap - adj[p][e_idx].flow);
+            int idx = parent_edge[curr];
+            bottleneck = min(bottleneck, adj[p][idx].cap - adj[p][idx].flow);
             curr = p;
         } while (curr != v);
 
         curr = v;
         do {
             int p = parent_node[curr];
-            int e_idx = parent_edge[curr];
-            adj[p][e_idx].flow += bottleneck;
-            adj[curr][adj[p][e_idx].rev].flow -= bottleneck;
+            int idx = parent_edge[curr];
+            adj[p][idx].flow += bottleneck;
+            adj[curr][adj[p][idx].rev].flow -= bottleneck;
             curr = p;
         } while (curr != v);
 
@@ -148,13 +134,15 @@ public:
     }
 
     long long minCostFlow(int s, int t, long long target_flow) {
-        if (!establish_initial_flow(s, t, target_flow)) return -1; // Infeasible
+        cycles_canceled = 0; 
+        if (!establish_initial_flow(s, t, target_flow)) return -1; 
+        
         while (cancel_negative_cycle());
         
         long long total_cost = 0;
         for (int u = 0; u < V; ++u) {
             for (const auto& e : adj[u]) {
-                if (e.flow > 0 && e.cap > 0) { // Only count forward edges
+                if (e.original && e.flow > 0) {
                     total_cost += e.flow * e.cost;
                 }
             }
@@ -170,12 +158,33 @@ int main(int argc, char* argv[]) {
     }
 
     ifstream infile(argv[1]);
-    int source = stoi(argv[2]);
-    int sink = stoi(argv[3]);
-    long long required_flow = stoll(argv[4]);
+    if (!infile) {
+        cerr << "Error opening graph file: " << argv[1] << endl;
+        return 1;
+    }
+
+    int source, sink;
+    long long required_flow;
+
+    try {
+        source = stoi(argv[2]);
+        sink = stoi(argv[3]);
+        required_flow = stoll(argv[4]);
+    } catch (const invalid_argument& e) {
+        cerr << "Error: Invalid numeric arguments provided." << endl;
+        return 1;
+    }
 
     int V, E;
-    infile >> V >> E;
+    if (!(infile >> V >> E)) {
+        cerr << "Error reading graph dimensions." << endl;
+        return 1;
+    }
+
+    if (source < 0 || source >= V || sink < 0 || sink >= V || required_flow < 0) {
+        cerr << "Error: Source/Sink out of bounds or negative flow requested." << endl;
+        return 1;
+    }
 
     CycleCanceling cc(V);
     for (int i = 0; i < E; ++i) {
