@@ -4,7 +4,7 @@ import random
 from pathlib import Path
 
 # Paths
-base = Path(__file__).resolve().parent.parent
+base = Path(__file__).resolve().parent.parent.parent
 data_dir = base / "datasets" / "snap"
 data_dir.mkdir(parents=True, exist_ok=True)
 
