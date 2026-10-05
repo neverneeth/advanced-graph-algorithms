@@ -28,6 +28,9 @@ private:
 
 public:
     long long cycles_canceled = 0;
+    long long searches = 0;
+    long long relaxation_checks = 0;
+    long long passes = 0;
 
     CycleCanceling(int V) : V(V), adj(V), dist(V), parent_node(V), parent_edge(V) {}
 
@@ -84,6 +87,7 @@ public:
     }
 
     bool cancel_negative_cycle() {
+        searches++;
         fill(dist.begin(), dist.end(), 0);
         fill(parent_node.begin(), parent_node.end(), -1);
         fill(parent_edge.begin(), parent_edge.end(), -1);
@@ -91,9 +95,11 @@ public:
         int x = -1;
 
         for (int iter = 0; iter < V; ++iter) {
+            passes++;
             x = -1;
             for (int u = 0; u < V; ++u) {
                 for (size_t i = 0; i < adj[u].size(); ++i) {
+                    relaxation_checks++;
                     auto& e = adj[u][i];
                     if (e.cap - e.flow > 0 && dist[e.to] > dist[u] + e.cost) {
                         dist[e.to] = dist[u] + e.cost;
@@ -202,7 +208,8 @@ int main(int argc, char* argv[]) {
     auto duration = duration_cast<microseconds>(end - start);
     
     cout << source << "," << sink << "," << required_flow << "," << min_cost << "," 
-         << cc.cycles_canceled << "," << duration.count() << endl;
+         << cc.cycles_canceled << "," << duration.count() << ","
+         << cc.searches << "," << cc.relaxation_checks << "," << cc.passes << endl;
 
     return 0;
 }

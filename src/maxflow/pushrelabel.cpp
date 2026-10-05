@@ -28,6 +28,14 @@ private:
     int max_height = 0;
 
     long long edge_scans = 0; 
+    long long total_pushes = 0;
+    long long saturating_pushes = 0;
+    long long nonsaturating_pushes = 0;
+    long long relabel_edge_scans = 0;
+    long long relabel_scans_high_degree = 0;
+    long long global_relabels = 0;
+    long long gap_triggers = 0;
+    long long excess_returned_to_source = 0;
 
     void add_to_bucket(int u) {
         if (excess[u] > 0 && height[u] < V) {
@@ -47,6 +55,7 @@ private:
     }
 
     void global_relabel(int sink) {
+        global_relabels++;
         fill(height.begin(), height.end(), 2 * V);
         fill(count.begin(), count.end(), 0);
         for (auto& b : buckets) b.clear();
@@ -82,7 +91,17 @@ private:
     }
 
     void push(int u, Edge& e, int source, int sink) {
-        long long d = min(excess[u], e.cap - e.flow);
+        long long residual = e.cap - e.flow;
+        long long d = min(excess[u], residual);
+        total_pushes++;
+        if (d == residual) {
+            saturating_pushes++;
+        } else {
+            nonsaturating_pushes++;
+        }
+        if (e.to == source) {
+            excess_returned_to_source += d;
+        }
         e.flow += d;
         adj[e.to][e.rev].flow -= d;
         excess[u] -= d;
@@ -97,13 +116,18 @@ private:
         int min_h = 2 * V;
         for (const Edge& e : adj[u]) {
             edge_scans++;
+            relabel_edge_scans++;
+            if (adj[u].size() > 80) relabel_scans_high_degree++;
             if (e.cap - e.flow > 0) {
                 min_h = min(min_h, height[e.to]);
             }
         }
 
         int old_h = height[u];
+        bool gap = false;
         if (--count[old_h] == 0 && old_h < V) {
+            gap = true;
+            gap_triggers++;
             for (int i = 0; i < V; ++i) {
                 if (height[i] > old_h && height[i] < V) {
                     count[height[i]]--;
@@ -113,7 +137,7 @@ private:
             }
         }
 
-        height[u] = min_h + 1;
+        height[u] = gap ? V + 1 : min_h + 1;
         count[height[u]]++;
         add_to_bucket(u);
     }
@@ -176,6 +200,14 @@ public:
     }
 
     long long get_edge_scans() const { return edge_scans; }
+    long long get_total_pushes() const { return total_pushes; }
+    long long get_saturating_pushes() const { return saturating_pushes; }
+    long long get_nonsaturating_pushes() const { return nonsaturating_pushes; }
+    long long get_relabel_edge_scans() const { return relabel_edge_scans; }
+    long long get_relabel_scans_high_degree() const { return relabel_scans_high_degree; }
+    long long get_global_relabels() const { return global_relabels; }
+    long long get_gap_triggers() const { return gap_triggers; }
+    long long get_excess_returned_to_source() const { return excess_returned_to_source; }
 };
 
 int main(int argc, char* argv[]) {
@@ -219,7 +251,11 @@ int main(int argc, char* argv[]) {
 
     auto duration = duration_cast<microseconds>(end - start);
     
-    cout << source << "," << sink << "," << max_flow << "," << pr.get_edge_scans() << "," << pr.relabel_operations << "," << duration.count() << endl;
+    cout << source << "," << sink << "," << max_flow << "," << pr.get_edge_scans() << "," << pr.relabel_operations << "," << duration.count()
+         << "," << pr.get_total_pushes() << "," << pr.get_saturating_pushes()
+         << "," << pr.get_nonsaturating_pushes() << "," << pr.get_relabel_edge_scans()
+         << "," << pr.get_relabel_scans_high_degree() << "," << pr.get_global_relabels()
+         << "," << pr.get_gap_triggers() << "," << pr.get_excess_returned_to_source() << endl;
 
     return 0;
 }

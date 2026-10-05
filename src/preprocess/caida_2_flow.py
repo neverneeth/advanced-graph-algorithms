@@ -79,7 +79,7 @@ def preprocess_caida_data(input_filepath, output_filepath):
     print(f"Success! Output saved to {output_filepath}")
 
 if __name__ == "__main__":
-    input_file = data / 'cycle-aslinks.l7.t1.c008040.20200101.txt'
+    input_file = data / 'cycle-aslinks.l7.t1.c008040.20200101.txt.gz'
     output_file = data / 'caida_bandwidth_graph.txt'
     
     if input_file.exists():

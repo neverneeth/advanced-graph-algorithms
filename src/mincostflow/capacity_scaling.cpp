@@ -19,20 +19,78 @@ struct Edge {
     bool original; 
 };
 
+// Capacity scaling (Ahuja, Magnanti & Orlin): source starts with excess
+// target_flow and sink with the matching deficit. Each Delta-phase first
+// saturates residual arcs >= Delta with negative reduced cost (Delta-optimality),
+// then augments from excess to deficit nodes along shortest paths in G(Delta).
 class CapacityScaling {
 private:
     int V;
     vector<vector<Edge>> adj;
     vector<long long> dist;
     vector<long long> pi;
+    vector<long long> excess;
     vector<int> parent_node;
     vector<int> parent_edge;
+
+    void push_flow(int u, Edge& e, long long amount) {
+        e.flow += amount;
+        adj[e.to][e.rev].flow -= amount;
+        excess[u] -= amount;
+        excess[e.to] += amount;
+    }
+
+    // Dijkstra from k over arcs with residual >= delta, stopping at the first
+    // node with deficit <= -delta. Returns that node, or -1 if none is reachable.
+    int shortest_path(int k, long long delta) {
+        searches++;
+        fill(dist.begin(), dist.end(), LLONG_MAX);
+        fill(parent_node.begin(), parent_node.end(), -1);
+        fill(parent_edge.begin(), parent_edge.end(), -1);
+        priority_queue<pair<long long, int>, vector<pair<long long, int>>, greater<pair<long long, int>>> pq;
+        dist[k] = 0;
+        pq.push({0, k});
+        int target = -1;
+
+        while (!pq.empty()) {
+            auto [d, u] = pq.top();
+            pq.pop();
+            if (d > dist[u]) continue;
+            if (excess[u] <= -delta) {
+                target = u;
+                break;
+            }
+            for (size_t i = 0; i < adj[u].size(); ++i) {
+                relaxation_checks++;
+                auto& e = adj[u][i];
+                if (e.cap - e.flow < delta) continue;
+                long long reduced_cost = e.cost + pi[u] - pi[e.to];
+                if (dist[e.to] > d + reduced_cost) {
+                    dist[e.to] = d + reduced_cost;
+                    parent_node[e.to] = u;
+                    parent_edge[e.to] = i;
+                    pq.push({dist[e.to], e.to});
+                }
+            }
+        }
+        if (target == -1) return -1;
+
+        // pi += min(dist, dist[target]) keeps every G(delta) reduced cost >= 0,
+        // including arcs into nodes the search never reached.
+        long long limit = dist[target];
+        for (int i = 0; i < V; ++i) pi[i] += min(dist[i], limit);
+        return target;
+    }
 
 public:
     long long augmentations = 0;
     long long scaling_phases = 0;
+    long long searches = 0;
+    long long relaxation_checks = 0;
+    long long saturated_arcs = 0;
 
-    CapacityScaling(int V) : V(V), adj(V), dist(V), pi(V, 0), parent_node(V), parent_edge(V) {}
+    CapacityScaling(int V)
+        : V(V), adj(V), dist(V), pi(V, 0), excess(V, 0), parent_node(V), parent_edge(V) {}
 
     void addEdge(int from, int to, long long cap, long long cost) {
         adj[from].push_back({to, cap, 0, cost, (int)adj[to].size(), true});
@@ -40,93 +98,67 @@ public:
     }
 
     long long minCostFlow(int s, int t, long long target_flow) {
-        long long max_cap = 0;
-        for (int u = 0; u < V; ++u) {
-            for (const auto& e : adj[u]) {
-                max_cap = max(max_cap, e.cap);
+        if (target_flow == 0) return 0;
+        excess[s] = target_flow;
+        excess[t] = -target_flow;
+
+        long long max_cap = target_flow;
+        for (int u = 0; u < V; ++u)
+            for (const auto& e : adj[u]) max_cap = max(max_cap, e.cap);
+
+        long long delta = 1;
+        while (delta <= max_cap / 2) delta *= 2;
+
+        for (; delta >= 1; delta /= 2) {
+            scaling_phases++;
+
+            for (int u = 0; u < V; ++u) {
+                for (auto& e : adj[u]) {
+                    long long residual = e.cap - e.flow;
+                    if (residual >= delta && e.cost + pi[u] - pi[e.to] < 0) {
+                        push_flow(u, e, residual);
+                        saturated_arcs++;
+                    }
+                }
+            }
+
+            // Excess nodes that cannot reach a deficit node in G(delta) are
+            // skipped for the rest of this phase.
+            vector<char> stuck(V, 0);
+            while (true) {
+                int k = -1;
+                for (int i = 0; i < V; ++i) {
+                    if (excess[i] >= delta && !stuck[i]) {
+                        k = i;
+                        break;
+                    }
+                }
+                if (k == -1) break;
+
+                int l = shortest_path(k, delta);
+                if (l == -1) {
+                    stuck[k] = 1;
+                    continue;
+                }
+
+                long long push = min(excess[k], -excess[l]);
+                for (int v = l; v != k; v = parent_node[v]) {
+                    auto& e = adj[parent_node[v]][parent_edge[v]];
+                    push = min(push, e.cap - e.flow);
+                }
+                for (int v = l; v != k; v = parent_node[v]) {
+                    int u = parent_node[v];
+                    push_flow(u, adj[u][parent_edge[v]], push);
+                }
+                // push_flow moved excess through every intermediate node and
+                // back out again, so only the endpoints change net.
+                augmentations++;
             }
         }
 
-        long long delta = 1;
-        while (delta <= max_cap) delta *= 2;
-        delta /= 2;
-        if (delta == 0) delta = 1;
+        for (int i = 0; i < V; ++i)
+            if (excess[i] != 0) return -1;
 
-        long long current_flow = 0;
-        
-        while (delta >= 1 && current_flow < target_flow) {
-            scaling_phases++;
-            bool path_found = true;
-            
-            while (path_found && current_flow < target_flow) {
-                fill(dist.begin(), dist.end(), LLONG_MAX);
-                fill(parent_node.begin(), parent_node.end(), -1);
-                fill(parent_edge.begin(), parent_edge.end(), -1);
-                
-                priority_queue<pair<long long, int>, vector<pair<long long, int>>, greater<pair<long long, int>>> pq;
-                
-                dist[s] = 0;
-                pq.push({0, s});
-                
-                while (!pq.empty()) {
-                    auto [d, u] = pq.top();
-                    pq.pop();
-                    
-                    if (d > dist[u]) continue; 
-                    
-                    for (size_t i = 0; i < adj[u].size(); ++i) {
-                        auto& e = adj[u][i];
-                        
-                        if (e.cap - e.flow >= delta) {
-                            long long reduced_cost = e.cost + pi[u] - pi[e.to];
-                            
-                            if (reduced_cost < 0) reduced_cost = 0; 
-
-                            if (dist[e.to] > dist[u] + reduced_cost) {
-                                dist[e.to] = dist[u] + reduced_cost;
-                                parent_node[e.to] = u;
-                                parent_edge[e.to] = i;
-                                pq.push({dist[e.to], e.to});
-                            }
-                        }
-                    }
-                }
-                
-                if (dist[t] == LLONG_MAX) {
-                    path_found = false; 
-                } else {
-                    for (int i = 0; i < V; ++i) {
-                        if (dist[i] != LLONG_MAX) {
-                            pi[i] += dist[i];
-                        }
-                    }
-                    
-                    long long push = target_flow - current_flow;
-                    int curr = t;
-                    while (curr != s) {
-                        int p = parent_node[curr];
-                        int idx = parent_edge[curr];
-                        push = min(push, adj[p][idx].cap - adj[p][idx].flow);
-                        curr = p;
-                    }
-                    
-                    curr = t;
-                    while (curr != s) {
-                        int p = parent_node[curr];
-                        int idx = parent_edge[curr];
-                        adj[p][idx].flow += push;
-                        adj[curr][adj[p][idx].rev].flow -= push;
-                        curr = p;
-                    }
-                    
-                    current_flow += push;
-                    augmentations++;
-                }
-            }
-            delta /= 2; 
-                }
-        
-        if (current_flow < target_flow) return -1; 
         long long total_cost = 0;
         for (int u = 0; u < V; ++u) {
             for (const auto& e : adj[u]) {
@@ -190,7 +222,9 @@ int main(int argc, char* argv[]) {
     auto duration = duration_cast<microseconds>(end - start);
     
     cout << source << "," << sink << "," << required_flow << "," << min_cost << "," 
-         << cs.augmentations << "," << duration.count() << endl;
+         << cs.augmentations << "," << duration.count() << ","
+         << cs.searches << "," << cs.relaxation_checks << ","
+         << cs.scaling_phases << "," << cs.saturated_arcs << endl;
 
     return 0;
 }

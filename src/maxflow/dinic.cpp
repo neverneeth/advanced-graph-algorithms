@@ -24,6 +24,7 @@ class Dinic {
     public:
         long long bfs_operations = 0;
         long long dfs_operations = 0;
+        long long bfs_phases = 0;
         Dinic(int V) : V(V), adj(V), level(V), ptr(V) {}
         
         void addEdge(int from, int to, long long cap) {
@@ -73,6 +74,7 @@ class Dinic {
         long long maxFlow(int s, int t) {
             long long flow = 0;
             while (bfs(s, t)) {
+                bfs_phases++;
                 fill(ptr.begin(), ptr.end(), 0);
                 while (long long pushed = dfs(s, t, LLONG_MAX)) {
                     flow += pushed;
@@ -126,7 +128,7 @@ int main(int argc, char* argv[]) {
 
     auto duration = duration_cast<microseconds>(end - start);
     // Machine readable output
-    cout << source << "," << sink << "," << max_flow << "," << dinic.bfs_operations << "," << dinic.dfs_operations << "," << duration.count() << endl;
+    cout << source << "," << sink << "," << max_flow << "," << dinic.bfs_operations << "," << dinic.dfs_operations << "," << duration.count() << "," << dinic.bfs_phases << endl;
 
     return 0;
 }
